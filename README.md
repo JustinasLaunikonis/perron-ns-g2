@@ -1,9 +1,18 @@
 # Perron-NS
 
 ![CI](https://github.com/JustinasLaunikonis/perron-ns-even-g2/actions/workflows/ci.yml/badge.svg)
+![Version](https://img.shields.io/badge/version-0.1.4-blue)
 ![License](https://img.shields.io/github/license/JustinasLaunikonis/perron-ns-even-g2)
 
 NS (Dutch Railways) journey planner for **Even Realities G2**, built as an **Even Hub** app. The glasses lens is a glanceable clock that displays live departure boards. The planning (From/To, favorites, recent journeys) can be set on the companion app. Live data comes from the NS Reisinformatie API through a tiny proxy.
+
+## Install
+
+Scan with the **Even Realities app** on your phone, or open the listing on Even Hub:
+
+[<img src="images/store-qr.png" alt="Install Perron-NS from Even Hub" width="180">](https://evenhub.evenrealities.com/landing?package_id=com.perron.ns)
+
+**[evenhub.evenrealities.com → Perron-NS](https://evenhub.evenrealities.com/landing?package_id=com.perron.ns)**
 
 ## Features
 
@@ -23,6 +32,18 @@ NS (Dutch Railways) journey planner for **Even Realities G2**, built as an **Eve
 2. **Times list** - upcoming departures for the selected route.
 3. **Journey detail** - the full board: per-leg times, stations, platforms,
    transfers and ETA.
+
+## Screenshots
+
+### On the glasses
+| Route select | Departures | Journey detail |
+|---|---|---|
+| ![Route select on the lens](images/glasses-1-route-select.png) | ![Departures board on the lens](images/glasses-2-departures.png) | ![Journey detail on the lens](images/glasses-3-journey-detail.png) |
+
+### On the phone
+| Planner | Results | Journey detail |
+|---|---|---|
+| <img src="images/phone-1-planner.jpg" alt="Phone planner" width="220"> | <img src="images/phone-2-results.jpg" alt="Phone results" width="220"> | <img src="images/phone-3-journey-detail.jpg" alt="Phone journey detail" width="220"> |
 
 ## Architecture
 
@@ -49,7 +70,7 @@ proxy/
   worker.js         Worker: injects the NS key, adds CORS, serves /privacy
   wrangler.toml     Worker deploy config
 assets/             app icon (component, foreground, background, composite)
-images/store/       glasses screenshots for the store listing
+images/             glasses + phone screenshots, store QR
 PRIVACY.md          privacy policy (also served at the proxy's /privacy)
 RELEASE_NOTES.md    store release notes
 CHANGELOG.md        version history
