@@ -1,5 +1,7 @@
 # Perron-NS
 
+![CI](https://github.com/JustinasLaunikonis/perron-ns-even-g2/actions/workflows/ci.yml/badge.svg)
+
 NS (Dutch Railways) journey planner for **Even Realities G2**, built as an **Even Hub** app. The glasses lens is a glanceable clock that displays live departure boards. The planning (From/To, favorites, recent journeys) can be set on the companion app. Live data comes from the NS Reisinformatie API through a tiny proxy.
 
 ## Features
