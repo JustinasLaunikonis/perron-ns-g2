@@ -1,31 +1,24 @@
 # Perron-NS
 
-NS (Dutch Railways) journey planner for **Even Realities G2**, built as an
-**Even Hub** app. The glasses lens is a glanceable clock that drills into live
-departure boards; the planning (From/To, favorites, recent journeys) lives on
-the companion phone. Live data comes from the NS Reisinformatie API through a
-tiny proxy, so no API key ships inside the app.
+NS (Dutch Railways) journey planner for **Even Realities G2**, built as an **Even Hub** app. The glasses lens is a glanceable clock that displays live departure boards. The planning (From/To, favorites, recent journeys) can be set on the companion app. Live data comes from the NS Reisinformatie API through a tiny proxy.
 
 ## Features
 
-- **Glanceable lens** — the current time, top-left, on every screen.
-- **Live departure boards** — times, delays (`+N`), platforms, transfers,
+- **Glanceable lens** - the current time, top-left, on every screen.
+- **Live departure boards** - times, delays (`+N`), platforms, transfers,
   cancellations and crowd forecasts, straight from NS.
-- **Phone planner** — From/To with live station autocomplete, a **Favorites**
+- **Phone planner** - From/To with live station autocomplete, a **Favorites**
   list, and a **"Plan again"** history of recent routes.
-- **Phone ↔ glasses mirroring** — whatever the phone shows, the lens follows;
+- **Phone ↔ glasses mirroring** - whatever the phone shows, the lens follows;
   temple gestures move the lens locally.
-- **Auto-refresh** — an open board re-fetches every 60s so cancellations and
+- **Auto-refresh** - an open board re-fetches every 60s so cancellations and
   delays land without re-navigating.
-- **No bundled secrets** — the NS key lives only in the proxy (Cloudflare
-  Worker), never in the `.ehpk`.
-- **Even OS 2.0 styling** — design tokens and the official icon set.
 
 ## Lens screens
 
-1. **Home** — clock plus your recent journeys; swipe to highlight one.
-2. **Times list** — upcoming departures for the selected route.
-3. **Journey detail** — the full board: per-leg times, stations, platforms,
+1. **Home** - clock plus your recent journeys. Swipe to highlight one.
+2. **Times list** - upcoming departures for the selected route.
+3. **Journey detail** - the full board: per-leg times, stations, platforms,
    transfers and ETA.
 
 ## Architecture
@@ -68,9 +61,9 @@ CHANGELOG.md        version history
 | Tap         | Open the journey  | View this departure | —                    |
 | Double-tap  | Exit app          | Back to home        | Back to times list   |
 
-Journeys are planned on the companion phone (it has a keyboard). The glasses show
+Journeys are planned on the companion app since it has a keyboard. The glasses show
 the clock and up to three recent journeys. Tap a journey to see its departure
-times; tap a time to open the full board — when and where each train leaves and
+times. Tap a time to open the full board - when and where each train leaves and
 arrives, and which platform to board. Double-tap steps back a screen, and exits
 the app from the home screen.
 
@@ -105,9 +98,9 @@ Worker URL. See [`proxy/README.md`](proxy/README.md) for details.
 
 ## Tech stack
 
-- **NS Reisinformatie API** — via a Cloudflare Worker proxy
-- **@evenrealities/even_hub_sdk** — glasses rendering + gesture events
-- **Vite + TypeScript** — build and dev server
-- **@evenrealities/evenhub-cli** — `qr` / `pack`
-- **@evenrealities/evenhub-simulator** — local preview + screenshot automation
-- **Even OS 2.0** — design tokens and icon set
+- **NS Reisinformatie API** - via a Cloudflare Worker proxy
+- **@evenrealities/even_hub_sdk** - glasses rendering + gesture events
+- **Vite + TypeScript** - build and dev server
+- **@evenrealities/evenhub-cli** - `qr` / `pack`
+- **@evenrealities/evenhub-simulator** - local preview + screenshot automation
+- **Even OS 2.0** - design tokens and icon set
