@@ -27,5 +27,8 @@ jobs:
       - name: Build (typecheck + vite build)
         run: npm run build
 
+      - name: Test
+        run: npm test
+
       - name: Pack
-        run: npm run pack 
+        run: npm run pack
