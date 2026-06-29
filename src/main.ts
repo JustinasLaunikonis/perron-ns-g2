@@ -7,13 +7,14 @@ import {
 } from '@evenrealities/even_hub_sdk'
 import { fetchStations, fetchTrips } from './ns'
 import type { StationInfo, Trip, TripLeg, TravelMode, TripOptions } from './ns'
+import { t as tr, getLang, setLang, dateLocale, LANGS } from './i18n'
+import type { Lang } from './i18n'
 import './style.css'
 
-// Only the icons actually referenced by icon() are imported, so unused SVGs are
-// not bundled into the .ehpk. Keys match the 'Folder/Name' strings passed to icon().
 import iconCross from './icons/Edit & Settings Icons/Cross.svg?raw'
 import iconSwitch from './icons/Edit & Settings Icons/Switch.svg?raw'
 import iconAccount from './icons/Feature & Function Icons/Account.svg?raw'
+import iconLanguages from './icons/Feature & Function Icons/Languages.svg?raw'
 import iconTimeCounting from './icons/Feature & Function Icons/Time Counting.svg?raw'
 import iconBack from './icons/Guide System/Back.svg?raw'
 import iconChevronBack from './icons/Guide System/Chevron - Back.svg?raw'
@@ -34,6 +35,7 @@ const ICON_RAW: Record<string, string> = {
   './icons/Edit & Settings Icons/Cross.svg': iconCross,
   './icons/Edit & Settings Icons/Switch.svg': iconSwitch,
   './icons/Feature & Function Icons/Account.svg': iconAccount,
+  './icons/Feature & Function Icons/Languages.svg': iconLanguages,
   './icons/Feature & Function Icons/Time Counting.svg': iconTimeCounting,
   './icons/Guide System/Back.svg': iconBack,
   './icons/Guide System/Chevron - Back.svg': iconChevronBack,
@@ -204,19 +206,16 @@ function removeFavorite(code: string) {
 }
 
 type TimeMode = 'departure' | 'arrival'
-// Committed departure/arrival selection used for trip planning.
-// planDateTime === null means "leave now".
 let planTimeMode: TimeMode = 'departure'
 let planDateTime: Date | null = null
 
 function tripOpts(): TripOptions {
-  if (!planDateTime) {
-    return {}
+  const opts: TripOptions = { lang: getLang() }
+  if (planDateTime) {
+    opts.dateTime = planDateTime.toISOString()
+    opts.searchForArrival = planTimeMode === 'arrival'
   }
-  return {
-    dateTime: planDateTime.toISOString(),
-    searchForArrival: planTimeMode === 'arrival',
-  }
+  return opts
 }
 
 function hhmm(iso: string): string {
@@ -229,6 +228,28 @@ function clockNow(): string {
 
 const bridge = await waitForEvenAppBridge()
 
+const LANG_KEY = 'perron-ns.lang.v1'
+
+async function loadLang(): Promise<void> {
+  try {
+    const stored = await bridge.getLocalStorage(LANG_KEY)
+    if (stored === 'nl' || stored === 'en') {
+      setLang(stored)
+    }
+  } catch (err) {
+    console.error('loadLang failed:', err)
+  }
+}
+
+async function persistLang() {
+  try {
+    await bridge.setLocalStorage(LANG_KEY, getLang())
+  } catch (err) {
+    console.error('persistLang failed:', err)
+  }
+}
+
+await loadLang()
 savedRoutes = await loadRoutes()
 favorites = await loadFavorites()
 
@@ -279,7 +300,7 @@ function lensContent(): string {
     journeyIdx = Math.max(0, count - 1)
   }
   const lines: string[] = [
-    'Please set a route in the app OR select from a previous journey:',
+    tr('lensPrompt'),
   ]
   for (let i = 0; i < savedRoutes.length && i < MAX_JOURNEYS; i++) {
     const r = savedRoutes[i]
@@ -287,7 +308,7 @@ function lensContent(): string {
     if (i === journeyIdx) {
       marker = '>'
     }
-    lines.push(marker + ' ' + (i + 1) + '. ' + r.fromName + ' to ' + r.toName)
+    lines.push(marker + ' ' + (i + 1) + '. ' + r.fromName + ' ' + tr('connectorTo') + ' ' + r.toName)
   }
   return lines.join('\n')
 }
@@ -338,7 +359,7 @@ function listContent(): string {
   }
   const head = route.fromName + ' > ' + route.toName
   if (detailStatus === 'loading') {
-    return head + '\n\nLoading times...'
+    return head + '\n\n' + tr('loadingTimes')
   }
   if (detailStatus === 'error') {
     return head + '\n\n! ' + detailError
@@ -366,12 +387,12 @@ function listContent(): string {
       marker = '>'
     }
     if (t.cancelled) {
-      lines.push(marker + ' ' + dep + ' - ' + arr + ' | CANCELLED')
+      lines.push(marker + ' ' + dep + ' - ' + arr + ' | ' + tr('cancelledCaps'))
     } else {
-      const tripTime = 'Trip time: ' + fmtDuration(t.durationMin) + 'h'
-      let transferWord = 'Transfers'
+      const tripTime = tr('tripTimeLabel') + ' ' + fmtDuration(t.durationMin) + 'h'
+      let transferWord = tr('transfers')
       if (t.transfers === 1) {
-        transferWord = 'Transfer'
+        transferWord = tr('transfer')
       }
       const transfers = t.transfers + 'x ' + transferWord
       lines.push(marker + ' ' + dep + ' - ' + arr + ' | ' + tripTime + ' | ' + transfers)
@@ -387,7 +408,7 @@ function detailContent(): string {
   }
   const count = visibleTripCount()
   if (count === 0) {
-    return route.fromName + ' > ' + route.toName + '\n\nNo departures found'
+    return route.fromName + ' > ' + route.toName + '\n\n' + tr('noDepartures')
   }
   if (tripIdx >= count) {
     tripIdx = count - 1
@@ -399,12 +420,12 @@ function detailContent(): string {
     lastArrDelay = trip.legs[trip.legs.length - 1].arrivalDelayMin
   }
   const eta = hhmm(trip.arrival) + delayTag(lastArrDelay)
-  const lines: string[] = [route.fromName + ' > ' + route.toName + ' | ETA: ' + eta, '']
+  const lines: string[] = [route.fromName + ' > ' + route.toName + ' | ' + tr('etaLabel') + ' ' + eta, '']
   if (trip.cancelled) {
     if (trip.cancellationReason) {
-      lines.push('CANCELLED — ' + trip.cancellationReason)
+      lines.push(tr('cancelledCaps') + ' — ' + trip.cancellationReason)
     } else {
-      lines.push('CANCELLED')
+      lines.push(tr('cancelledCaps'))
     }
     lines.push('')
   }
@@ -416,14 +437,14 @@ function detailContent(): string {
     }
     let originPlatform = ''
     if (leg.originTrack) {
-      originPlatform = ' | Platform: ' + leg.originTrack
+      originPlatform = ' | ' + tr('platformLabel') + ' ' + leg.originTrack
     }
     let destPlatform = ''
     if (leg.destinationTrack) {
-      destPlatform = ' | Platform: ' + leg.destinationTrack
+      destPlatform = ' | ' + tr('platformLabel') + ' ' + leg.destinationTrack
     }
     lines.push(hhmm(leg.departure) + delayTag(leg.departureDelayMin) + ' ' + leg.origin + originPlatform)
-    lines.push('    ' + modeTag + 'Trip: ' + legDurationText(leg.durationMin))
+    lines.push('    ' + modeTag + tr('tripLegLabel') + ' ' + legDurationText(leg.durationMin))
     lines.push(hhmm(leg.arrival) + delayTag(leg.arrivalDelayMin) + ' ' + leg.destination + destPlatform)
     if (i < trip.legs.length - 1) {
       const next = trip.legs[i + 1]
@@ -432,7 +453,7 @@ function detailContent(): string {
         gap = 0
       }
       lines.push('')
-      lines.push('Change (' + gap + ' min)')
+      lines.push(tr('changeLabel') + ' (' + gap + ' ' + tr('minShort') + ')')
       lines.push('')
     }
   }
@@ -462,7 +483,7 @@ async function openTripList() {
       detailStatus = 'ready'
     } else {
       detailStatus = 'error'
-      detailError = 'No departures found'
+      detailError = tr('noDepartures')
     }
   } catch (e) {
     detailStatus = 'error'
@@ -665,12 +686,19 @@ const app = document.querySelector<HTMLDivElement>('#app')!
 app.innerHTML = `
   <main class="planner">
 
+    <div class="lang-row">
+      <div class="lang-picker">
+        <button id="lang-toggle" type="button" class="lang-btn" aria-label="${tr('ariaLang')}" aria-haspopup="listbox" aria-expanded="false">${icon('Feature & Function Icons/Languages', { size: 20 })}</button>
+        <ul id="lang-menu" role="listbox" hidden class="autocomplete lang-menu"></ul>
+      </div>
+    </div>
+
     <section class="route-card">
       <div class="route-line"></div>
 
       <label class="route-field">
         <span class="route-marker">${icon('Navigate Feature Icon/Location', { size: 20 })}</span>
-        <input id="from" type="text" placeholder="From" autocomplete="off" role="combobox" aria-autocomplete="list" aria-expanded="false" class="route-input" />
+        <input id="from" type="text" placeholder="${tr('from')}" autocomplete="off" role="combobox" aria-autocomplete="list" aria-expanded="false" class="route-input" />
         <ul id="from-list" role="listbox" hidden class="autocomplete autocomplete--route"></ul>
       </label>
 
@@ -678,40 +706,40 @@ app.innerHTML = `
 
       <label class="route-field">
         <span class="route-marker">${icon('Navigate Feature Icon/End Location', { size: 20 })}</span>
-        <input id="to" type="text" placeholder="To" autocomplete="off" role="combobox" aria-autocomplete="list" aria-expanded="false" class="route-input" />
+        <input id="to" type="text" placeholder="${tr('to')}" autocomplete="off" role="combobox" aria-autocomplete="list" aria-expanded="false" class="route-input" />
         <ul id="to-list" role="listbox" hidden class="autocomplete autocomplete--route"></ul>
       </label>
 
-      <button id="swap" type="button" aria-label="Swap origin and destination" class="swap-btn">${icon('Edit & Settings Icons/Switch', { size: 22 })}</button>
+      <button id="swap" type="button" aria-label="${tr('ariaSwap')}" class="swap-btn">${icon('Edit & Settings Icons/Switch', { size: 22 })}</button>
     </section>
 
     <div class="action-row">
       <button id="dep-box" type="button" class="dep-box" aria-haspopup="dialog">
-        <span class="dep-box-text"><span id="dep-label">Departure:</span><span id="dep-value" class="muted"> now</span></span>
+        <span class="dep-box-text"><span id="dep-label">${tr('departureLabel')}</span><span id="dep-value" class="muted"> ${tr('now')}</span></span>
         <span class="dep-box-icon muted">${icon('Feature & Function Icons/Time Counting', { size: 18 })}</span>
       </button>
     </div>
 
     <div class="action-row">
-      <button id="plan" type="button" class="plan-btn">${ARROW_ICON}<span>Plan your journey</span></button>
-      <button id="clear-search" type="button" aria-label="Clear search" class="clear-btn">${icon('Edit & Settings Icons/Cross', { size: 18 })}</button>
+      <button id="plan" type="button" class="plan-btn">${ARROW_ICON}<span id="plan-text">${tr('plan')}</span></button>
+      <button id="clear-search" type="button" aria-label="${tr('ariaClear')}" class="clear-btn">${icon('Edit & Settings Icons/Cross', { size: 18 })}</button>
     </div>
 
     <div id="home-sections">
       <section class="panel panel--fav">
-        <div class="panel-title">Favorites</div>
+        <div class="panel-title" id="fav-title">${tr('favorites')}</div>
         <div id="fav-list"></div>
         <div class="fav-add-row">
           <span class="fav-search">
-            <input id="fav-input" type="text" placeholder="Search a station" autocomplete="off" role="combobox" aria-autocomplete="list" aria-expanded="false" class="fav-search-input" />
+            <input id="fav-input" type="text" placeholder="${tr('searchStation')}" autocomplete="off" role="combobox" aria-autocomplete="list" aria-expanded="false" class="fav-search-input" />
             <ul id="fav-list-dropdown" role="listbox" hidden class="autocomplete"></ul>
           </span>
-          <button id="fav-add" type="button" class="add-btn">Add</button>
+          <button id="fav-add" type="button" class="add-btn">${tr('add')}</button>
         </div>
       </section>
 
       <section class="panel panel--again">
-        <div class="panel-title">Plan again ...</div>
+        <div class="panel-title" id="again-title">${tr('planAgain')}</div>
         <div id="saved"></div>
       </section>
     </div>
@@ -859,7 +887,7 @@ function attachAutocomplete(input: HTMLInputElement, list: HTMLUListElement, sav
       if (saveable) {
         const star = document.createElement('button')
         star.type = 'button'
-        star.setAttribute('aria-label', 'Save to favorites')
+        star.setAttribute('aria-label', tr('ariaSaveFav'))
         star.className = 'option-star'
         star.innerHTML = starSvg(isFavorite(st.code))
         star.addEventListener('mousedown', function (e) {
@@ -978,19 +1006,19 @@ function modeIcon(mode: TravelMode, size: number): string {
 
 function modeLabel(mode: TravelMode): string {
   if (mode === 'BUS') {
-    return 'Bus'
+    return tr('modeBus')
   }
   if (mode === 'TRAM') {
-    return 'Tram'
+    return tr('modeTram')
   }
   if (mode === 'METRO') {
-    return 'Metro'
+    return tr('modeMetro')
   }
   if (mode === 'FERRY') {
-    return 'Ferry'
+    return tr('modeFerry')
   }
   if (mode === 'WALK') {
-    return 'Walk'
+    return tr('modeWalk')
   }
   return ''
 }
@@ -1003,7 +1031,7 @@ function legBadgeLabel(leg: TripLeg): string {
   if (label) {
     return label
   }
-  return 'Train'
+  return tr('modeTrain')
 }
 
 function iconSvg(kind: FavIcon, size: number): string {
@@ -1034,15 +1062,15 @@ function crowdBadge(crowd: string): string {
   if (crowd === 'LOW') {
     n = 1
     cls = 'crowd--low'
-    label = 'Quiet'
+    label = tr('crowdQuiet')
   } else if (crowd === 'MEDIUM') {
     n = 2
     cls = 'crowd--medium'
-    label = 'Busy'
+    label = tr('crowdBusy')
   } else if (crowd === 'HIGH') {
     n = 3
     cls = 'crowd--high'
-    label = 'Very busy'
+    label = tr('crowdVeryBusy')
   } else {
     return ''
   }
@@ -1086,7 +1114,7 @@ function renderTrips(trips: Trip[]) {
   }
   results.innerHTML = ''
   if (trips.length === 0) {
-    setResults('<p class="notice">No journeys found.</p>')
+    setResults('<p class="notice">' + tr('noJourneys') + '</p>')
     return
   }
   for (let idx = 0; idx < trips.length; idx++) {
@@ -1120,7 +1148,7 @@ function renderTrips(trips: Trip[]) {
       if (trip.cancellationReason) {
         reason = ' - ' + trip.cancellationReason
       }
-      cancelledHtml = '<div class="trip-cancelled">Cancelled' + reason + '</div>'
+      cancelledHtml = '<div class="trip-cancelled">' + tr('cancelled') + reason + '</div>'
     }
 
     card.innerHTML = `
@@ -1173,24 +1201,24 @@ function legDurationText(min: number): string {
 
 function fmtDateHeader(iso: string): string {
   const d = new Date(iso)
-  const dateStr = d.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
+  const dateStr = d.toLocaleDateString(dateLocale(), { day: 'numeric', month: 'long', year: 'numeric' })
   if (d.toDateString() === new Date().toDateString()) {
-    return 'Today, ' + dateStr
+    return tr('today') + ', ' + dateStr
   }
   return dateStr
 }
 
 function crowdInline(crowd: string): string {
-  let text = 'Crowdedness unknown'
+  let text = tr('crowdUnknown')
   let cls = 'ctext--unknown'
   if (crowd === 'LOW') {
-    text = 'Calm'
+    text = tr('crowdCalm')
     cls = 'ctext--low'
   } else if (crowd === 'MEDIUM') {
-    text = 'Busy'
+    text = tr('crowdBusyInline')
     cls = 'ctext--medium'
   } else if (crowd === 'HIGH') {
-    text = 'Crowded'
+    text = tr('crowdCrowded')
     cls = 'ctext--high'
   }
   return '<span class="' + cls + '">' + text + '</span>'
@@ -1206,14 +1234,14 @@ function platformBadge(track: string): string {
 const STATION_DOT = '<span class="station-dot"></span>'
 
 function legCard(leg: TripLeg): string {
-  let stopWord = 'intermediate stops'
+  let stopWord = tr('stopsPlural')
   if (leg.intermediateStops === 1) {
-    stopWord = 'intermediate stop'
+    stopWord = tr('stopsSingular')
   }
   const stops = leg.intermediateStops + ' ' + stopWord
   let exitHtml = ''
   if (leg.exitSide) {
-    exitHtml = '<span class="leg-exit">Exit side ' + leg.exitSide.toLowerCase() + '</span>'
+    exitHtml = '<span class="leg-exit">' + tr('exitSideLabel') + ' ' + leg.exitSide.toLowerCase() + '</span>'
   }
   return `
     <div class="leg">
@@ -1238,7 +1266,7 @@ function legCard(leg: TripLeg): string {
         <div class="leg-service">
           <div class="leg-service-text">
             <div class="leg-service-name">${leg.displayName}</div>
-            <div class="leg-service-dir">to ${leg.direction}</div>
+            <div class="leg-service-dir">${tr('connectorTo')} ${leg.direction}</div>
             <div class="leg-service-meta">${crowdInline(leg.crowd)} · ${stops}</div>
           </div>
           ${CHEVRON_ICON}
@@ -1268,13 +1296,13 @@ function transferBlock(prev: TripLeg, next: TripLeg): string {
   if (walk !== null) {
     walkLabel = walk
   }
-  let walkText = 'Walk to transfer'
+  let walkText = tr('walkToTransfer')
   if (next.originTrack) {
-    walkText = 'Walk to platform ' + next.originTrack
+    walkText = tr('walkToPlatform') + ' ' + next.originTrack
   }
   let checkInOut = ''
   if (prev.operator && next.operator && prev.operator !== next.operator) {
-    checkInOut = 'Check out/in: ' + prev.operator.split(' ')[0] + ' - ' + next.operator.split(' ')[0]
+    checkInOut = tr('checkOutIn') + ' ' + prev.operator.split(' ')[0] + ' - ' + next.operator.split(' ')[0]
   }
 
   function row(left: string, text: string): string {
@@ -1285,12 +1313,12 @@ function transferBlock(prev: TripLeg, next: TripLeg): string {
     </div>`
   }
 
-  let rows = row(walkLabel + ' min', walkText)
+  let rows = row(walkLabel + ' ' + tr('minShort'), walkText)
   if (checkInOut) {
     rows += row(WALK_ICON, checkInOut)
   }
   if (wait !== null && wait > 0) {
-    rows += row(wait + ' min', 'Wait')
+    rows += row(wait + ' ' + tr('minShort'), tr('wait'))
   }
 
   return `
@@ -1381,7 +1409,7 @@ function buildDetail(trip: Trip): string {
   }
   return `
     <header class="detail-header">
-      <button id="detail-back" type="button" aria-label="Back" class="icon-btn">${BACK_ICON}</button>
+      <button id="detail-back" type="button" aria-label="${tr('ariaBack')}" class="icon-btn">${BACK_ICON}</button>
       <div class="detail-title">
         <div class="detail-title-main">${from} - ${to}</div>
         <div class="detail-title-sub">${fmtDateHeader(trip.departure)}</div>
@@ -1441,7 +1469,7 @@ errorModal.className = 'modal-backdrop'
 errorModal.innerHTML = `
   <div class="modal-card" role="alertdialog" aria-modal="true">
     <p class="modal-text"></p>
-    <button type="button" class="modal-ok">OK</button>
+    <button type="button" class="modal-ok">${tr('ok')}</button>
   </div>`
 document.body.appendChild(errorModal)
 
@@ -1472,8 +1500,6 @@ document.addEventListener('keydown', function (e) {
   }
 })
 
-// ---- Departure / Arrival time picker ----
-
 const DAY_MS = 86400000
 const WHEEL_ITEM_H = 56
 
@@ -1491,20 +1517,20 @@ function dayLabel(d: Date): string {
   const today = startOfDay(new Date())
   const diff = Math.round((startOfDay(d).getTime() - today.getTime()) / DAY_MS)
   if (diff === 0) {
-    return 'Today'
+    return tr('today')
   }
   if (diff === 1) {
-    return 'Tomorrow'
+    return tr('tomorrow')
   }
   if (diff === -1) {
-    return 'Yesterday'
+    return tr('yesterday')
   }
-  return d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })
+  return d.toLocaleDateString(dateLocale(), { weekday: 'short', day: 'numeric', month: 'short' })
 }
 
 function formatPlanValue(): string {
   if (!planDateTime) {
-    return ' now'
+    return ' ' + tr('now')
   }
   const time = planDateTime.toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' })
   return ' ' + dayLabel(planDateTime) + ' ' + time
@@ -1516,9 +1542,9 @@ const depValueEl = document.getElementById('dep-value')
 function updateDepBox() {
   if (depLabelEl) {
     if (planTimeMode === 'arrival') {
-      depLabelEl.textContent = 'Arrival:'
+      depLabelEl.textContent = tr('arrivalLabel')
     } else {
-      depLabelEl.textContent = 'Departure:'
+      depLabelEl.textContent = tr('departureLabel')
     }
   }
   if (depValueEl) {
@@ -1534,33 +1560,32 @@ timeModal.id = 'time-modal'
 timeModal.hidden = true
 timeModal.className = 'modal-backdrop'
 timeModal.innerHTML = `
-  <div class="time-card" role="dialog" aria-modal="true" aria-label="Choose time">
+  <div class="time-card" role="dialog" aria-modal="true" aria-label="${tr('ariaChooseTime')}">
     <div class="time-tabs">
-      <button id="tab-dep" type="button" class="time-tab">Departure</button>
-      <button id="tab-arr" type="button" class="time-tab">Arrival</button>
+      <button id="tab-dep" type="button" class="time-tab">${tr('tabDeparture')}</button>
+      <button id="tab-arr" type="button" class="time-tab">${tr('tabArrival')}</button>
     </div>
     <div class="time-picker">
       <div class="wheels">
         <div class="wheel-overlay"></div>
-        <div id="wheel-hour" class="wheel" aria-label="Hour"></div>
+        <div id="wheel-hour" class="wheel" aria-label="${tr('ariaHour')}"></div>
         <span class="wheel-colon">:</span>
-        <div id="wheel-min" class="wheel" aria-label="Minute"></div>
+        <div id="wheel-min" class="wheel" aria-label="${tr('ariaMinute')}"></div>
       </div>
-      <button id="time-now" type="button" class="time-now">Now</button>
+      <button id="time-now" type="button" class="time-now">${tr('nowButton')}</button>
     </div>
     <div class="time-date">
-      <button id="date-prev" type="button" class="date-arrow" aria-label="Previous day">${CHEVRON_LEFT}</button>
-      <span id="date-label" class="date-label">Today</span>
-      <button id="date-next" type="button" class="date-arrow" aria-label="Next day">${CHEVRON_RIGHT}</button>
+      <button id="date-prev" type="button" class="date-arrow" aria-label="${tr('ariaPrevDay')}">${CHEVRON_LEFT}</button>
+      <span id="date-label" class="date-label">${tr('today')}</span>
+      <button id="date-next" type="button" class="date-arrow" aria-label="${tr('ariaNextDay')}">${CHEVRON_RIGHT}</button>
     </div>
     <div class="time-actions">
-      <button id="time-cancel" type="button" class="time-cancel">Cancel</button>
-      <button id="time-done" type="button" class="time-done">Done</button>
+      <button id="time-cancel" type="button" class="time-cancel">${tr('cancel')}</button>
+      <button id="time-done" type="button" class="time-done">${tr('done')}</button>
     </div>
   </div>`
 document.body.appendChild(timeModal)
 
-// Transient picker state, copied from the committed selection on open.
 let pickerMode: TimeMode = 'departure'
 let pickerDate: Date = startOfDay(new Date())
 let pickerIsNow = true
@@ -1664,7 +1689,6 @@ function updateNowState() {
 
 function updateDateRow() {
   dateLabelEl.textContent = dayLabel(pickerDate)
-  // Never plan a journey in the past.
   datePrev.disabled = sameDay(pickerDate, new Date())
 }
 
@@ -1680,7 +1704,6 @@ function openTimeModal() {
   updateNowState()
   updateDateRow()
   timeModal.hidden = false
-  // Wheels can only be scrolled once the modal is visible (laid out).
   hourWheel.set(base.getHours())
   minWheel.set(base.getMinutes())
 }
@@ -1710,13 +1733,11 @@ function commitTime() {
   }
   closeTimeModal()
   updateDepBox()
-  // If a journey is already on screen, re-plan it with the new time.
   if (results && results.children.length > 0) {
     planJourney().catch(function (err) {
       console.error(err)
     })
   } else if (view !== 'home') {
-    // A list/detail is mirrored to the glasses lens — refresh it too.
     openTripList().catch(function (err) {
       console.error(err)
     })
@@ -1770,21 +1791,21 @@ async function planJourney() {
     return
   }
   if (!stationList.length) {
-    setResults('<p class="notice">Loading stations…</p>')
+    setResults('<p class="notice">' + tr('loadingStations') + '</p>')
     return
   }
   const fromCode = resolveCode(fromEl)
   const toCode = resolveCode(toEl)
   if (!fromCode || !toCode) {
-    showError('Pick both a From and To station.')
+    showError(tr('errPickBoth'))
     return
   }
   if (fromCode === toCode) {
-    showError('From and To are the same station.')
+    showError(tr('errSameStation'))
     return
   }
   showPlanAgain(false)
-  setResults('<p class="notice">Planning…</p>')
+  setResults('<p class="notice">' + tr('planning') + '</p>')
   const route: SavedRoute = {
     fromCode: fromCode,
     fromName: nameForCode(fromCode),
@@ -1808,7 +1829,7 @@ async function planJourney() {
         detailStatus = 'ready'
       } else {
         detailStatus = 'error'
-        detailError = 'No departures found'
+        detailError = tr('noDepartures')
       }
       renderLens().catch(function (err) {
         console.error(err)
@@ -1824,7 +1845,7 @@ async function planJourney() {
     }
     setResults('')
     showPlanAgain(true)
-    showError('Could not plan journey: ' + msg)
+    showError(tr('errCouldNotPlan') + msg)
     if (detailRoute === route) {
       detailStatus = 'error'
       detailError = msg
@@ -1904,7 +1925,7 @@ function renderSavedRoutes() {
     return
   }
   if (savedRoutes.length === 0) {
-    el.innerHTML = '<div class="empty-note">You have no recently planned journeys</div>'
+    el.innerHTML = '<div class="empty-note">' + tr('noRecent') + '</div>'
     return
   }
   let html = ''
@@ -1913,7 +1934,7 @@ function renderSavedRoutes() {
     html +=
       '<div class="chip row-item row-divider" data-ri="' + i + '">' +
       '<span class="row-name">' + r.fromName + ' ' + icon('Guide System/Go', { size: 15, cls: 'muted' }) + ' ' + r.toName + '</span>' +
-      '<button class="del menu-btn" data-ri="' + i + '" type="button" aria-label="Remove route">' + MENU_DOTS + '</button>' +
+      '<button class="del menu-btn" data-ri="' + i + '" type="button" aria-label="' + tr('ariaRemoveRoute') + '">' + MENU_DOTS + '</button>' +
       '</div>'
   }
   el.innerHTML = html
@@ -1950,7 +1971,7 @@ function renderFavorites() {
     return
   }
   if (favorites.length === 0) {
-    el.innerHTML = '<div class="empty-note row-divider">Save favorite locations and plan directly.</div>'
+    el.innerHTML = '<div class="empty-note row-divider">' + tr('favEmpty') + '</div>'
     return
   }
   let html = ''
@@ -1960,7 +1981,7 @@ function renderFavorites() {
       '<div class="fav row-item row-divider" data-fi="' + i + '">' +
       '<span class="row-icon">' + iconSvg(f.icon, 22) + '</span>' +
       '<span class="row-name">' + f.label + '</span>' +
-      '<button class="favmenu menu-btn" data-fi="' + i + '" type="button" aria-label="Edit favorite">' + MENU_DOTS + '</button>' +
+      '<button class="favmenu menu-btn" data-fi="' + i + '" type="button" aria-label="' + tr('ariaEditFav') + '">' + MENU_DOTS + '</button>' +
       '</div>'
   }
   el.innerHTML = html
@@ -1987,7 +2008,7 @@ if (favAddBtn) {
     }
     const code = resolveCode(favInput)
     if (!code) {
-      favInput.placeholder = 'Pick a station first'
+      favInput.placeholder = tr('pickStationFirst')
       return
     }
     addFavorite({ code: code, name: nameForCode(code) })
@@ -2022,8 +2043,8 @@ function showFavEdit(index: number) {
   const safeLabel = fav.label.replace(/"/g, '&quot;')
   favEditView.innerHTML = `
     <header class="detail-header">
-      <button id="fav-back" type="button" aria-label="Back" class="icon-btn">${BACK_ICON}</button>
-      <div class="sheet-title">Favorite location</div>
+      <button id="fav-back" type="button" aria-label="${tr('ariaBack')}" class="icon-btn">${BACK_ICON}</button>
+      <div class="sheet-title">${tr('favLocationTitle')}</div>
       <span class="header-spacer"></span>
     </header>
     <main class="sheet-main">
@@ -2031,19 +2052,19 @@ function showFavEdit(index: number) {
         <span class="fav-preview-pill">${fav.name}</span>
       </div>
 
-      <div class="field-label">Name</div>
+      <div class="field-label">${tr('nameLabel')}</div>
       <div class="name-field">
         <input id="fav-name" type="text" value="${safeLabel}" class="name-input" />
-        <button id="fav-name-clear" type="button" aria-label="Clear" class="name-clear">${icon('Edit & Settings Icons/Cross', { size: 18 })}</button>
+        <button id="fav-name-clear" type="button" aria-label="${tr('ariaClearName')}" class="name-clear">${icon('Edit & Settings Icons/Cross', { size: 18 })}</button>
       </div>
 
-      <div class="field-label mt">Icon</div>
+      <div class="field-label mt">${tr('iconLabel')}</div>
       <div id="icon-cards" class="icon-cards">
-        ${iconCard('home', 'Home')}${iconCard('work', 'Work')}${iconCard('default', 'Default')}
+        ${iconCard('home', tr('favHome'))}${iconCard('work', tr('favWork'))}${iconCard('default', tr('favDefault'))}
       </div>
 
-      <button id="fav-save" type="button" class="sheet-save">Save</button>
-      <button id="fav-remove" type="button" class="sheet-remove">Remove from favorites</button>
+      <button id="fav-save" type="button" class="sheet-save">${tr('save')}</button>
+      <button id="fav-remove" type="button" class="sheet-remove">${tr('removeFav')}</button>
     </main>`
 
   function close() {
@@ -2104,6 +2125,137 @@ function showFavEdit(index: number) {
 }
 
 renderFavorites()
+function setText(id: string, text: string) {
+  const el = document.getElementById(id)
+  if (el) {
+    el.textContent = text
+  }
+}
+function setPlaceholder(id: string, text: string) {
+  const el = document.getElementById(id) as HTMLInputElement | null
+  if (el) {
+    el.placeholder = text
+  }
+}
+function setAria(id: string, text: string) {
+  const el = document.getElementById(id)
+  if (el) {
+    el.setAttribute('aria-label', text)
+  }
+}
+
+function localizeStatic() {
+  setPlaceholder('from', tr('from'))
+  setPlaceholder('to', tr('to'))
+  setAria('swap', tr('ariaSwap'))
+  setText('plan-text', tr('plan'))
+  setAria('clear-search', tr('ariaClear'))
+  setText('fav-title', tr('favorites'))
+  setPlaceholder('fav-input', tr('searchStation'))
+  setText('fav-add', tr('add'))
+  setText('again-title', tr('planAgain'))
+  setAria('lang-toggle', tr('ariaLang'))
+  updateDepBox()
+
+  setText('tab-dep', tr('tabDeparture'))
+  setText('tab-arr', tr('tabArrival'))
+  setText('time-now', tr('nowButton'))
+  setText('time-cancel', tr('cancel'))
+  setText('time-done', tr('done'))
+  setAria('wheel-hour', tr('ariaHour'))
+  setAria('wheel-min', tr('ariaMinute'))
+  setAria('date-prev', tr('ariaPrevDay'))
+  setAria('date-next', tr('ariaNextDay'))
+
+  const okBtn = errorModal.querySelector<HTMLButtonElement>('.modal-ok')
+  if (okBtn) {
+    okBtn.textContent = tr('ok')
+  }
+}
+
+function applyLanguage() {
+  localizeStatic()
+  renderLangMenu()
+  renderSavedRoutes()
+  renderFavorites()
+  renderLens().catch(function (err) {
+    console.error(err)
+  })
+}
+
+const langToggle = document.getElementById('lang-toggle')
+const langMenu = document.getElementById('lang-menu') as HTMLUListElement | null
+
+function closeLangMenu() {
+  if (langMenu) {
+    langMenu.hidden = true
+  }
+  if (langToggle) {
+    langToggle.setAttribute('aria-expanded', 'false')
+  }
+}
+
+function selectLang(code: Lang) {
+  closeLangMenu()
+  if (code === getLang()) {
+    return
+  }
+  setLang(code)
+  persistLang()
+  applyLanguage()
+}
+
+function renderLangMenu() {
+  if (!langMenu) {
+    return
+  }
+  langMenu.innerHTML = ''
+  for (const l of LANGS) {
+    const li = document.createElement('li')
+    li.setAttribute('role', 'option')
+    li.className = 'option'
+    const current = l.code === getLang()
+    li.setAttribute('aria-selected', current ? 'true' : 'false')
+    if (current) {
+      li.classList.add('active')
+    }
+    const name = document.createElement('span')
+    name.textContent = l.label
+    name.className = 'option-name'
+    li.appendChild(name)
+    li.addEventListener('click', function () {
+      selectLang(l.code)
+    })
+    langMenu.appendChild(li)
+  }
+}
+
+if (langToggle && langMenu) {
+  renderLangMenu()
+  langToggle.addEventListener('click', function (e) {
+    e.stopPropagation()
+    const willOpen = langMenu.hidden
+    if (willOpen) {
+      renderLangMenu()
+    }
+    langMenu.hidden = !willOpen
+    langToggle.setAttribute('aria-expanded', willOpen ? 'true' : 'false')
+  })
+  document.addEventListener('click', function (e) {
+    if (langMenu.hidden) {
+      return
+    }
+    const target = e.target as Node
+    if (!langToggle.contains(target) && !langMenu.contains(target)) {
+      closeLangMenu()
+    }
+  })
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && !langMenu.hidden) {
+      closeLangMenu()
+    }
+  })
+}
 
 await renderLens()
 clockTimer = setInterval(function () {

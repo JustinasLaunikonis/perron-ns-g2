@@ -152,10 +152,9 @@ function legMode(l: any): TravelMode {
 }
 
 export interface TripOptions {
-  // ISO 8601 instant the search is anchored to. Omit for "now".
   dateTime?: string
-  // When true, dateTime is treated as the desired arrival time instead of departure.
   searchForArrival?: boolean
+  lang?: string
 }
 
 export async function fetchTrips(
@@ -163,9 +162,15 @@ export async function fetchTrips(
   toCode: string,
   opts: TripOptions = {},
 ): Promise<Trip[]> {
+  let lang = 'en'
+  if (opts.lang) {
+    lang = opts.lang
+  }
   let url =
     BASE +
-    '/v3/trips?lang=en&fromStation=' +
+    '/v3/trips?lang=' +
+    encodeURIComponent(lang) +
+    '&fromStation=' +
     encodeURIComponent(fromCode) +
     '&toStation=' +
     encodeURIComponent(toCode)
