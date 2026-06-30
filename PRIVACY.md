@@ -82,4 +82,4 @@ revised policy will be published at the same location as this document.
 
 Questions about this policy or your data:
 
-**Justinas Launikonis** — justinas.launikonis@gmail.com
+**Justinas Launikonis** — justinas.launikonis@student.nhlstenden.com
